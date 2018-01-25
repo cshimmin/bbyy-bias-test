@@ -34,6 +34,7 @@ if __name__ == "__main__":
     parser.add_argument("--poisson", action="store_true", help="Randomize number of generated events by poisson sampling.")
     parser.add_argument("--only-good", action="store_true", help="Only write out fits that had 0/0 status.")
     parser.add_argument("--skip-minos", action="store_true", help="Do not run minos, only migrad")
+    parser.add_argument("--hesse", action="store_true", help="Run Hesse after Migrad")
     args = parser.parse_args()
 
     r.RooRandom.randomGenerator().SetSeed(args.seed)
@@ -161,20 +162,22 @@ if __name__ == "__main__":
     for ds in datasets:
         nll = pdf.createNLL(ds)
 
+        fit_statuses = []
         minimizer = r.RooMinuit(nll)
         minimizer.migrad()
-        status1 = minimizer.save().status()
-        if args.skip_minos:
-            status2=0
-        else:
+        fit_statuses.append(minimizer.save().status())
+        if args.hesse:
+            minimizer.hesse()
+            fit_statuses.append(minimizer.save().status())
+        if not args.skip_minos:
             minimizer.minos()
-            status2 = minimizer.save().status()
+            fit_statuses.append(minimizer.save().status())
 
-        if args.only_good and max((status1, status2))>0:
+        if args.only_good and max(fit_statuses)>0:
             status_skip += 1
             continue
 
-        statuses.append( (status1, status2) )
+        statuses.append( tuple(fit_statuses) )
 
         poi_vals.append(xsec.getVal())
         other_vals.append(tuple([w.obj(k).getVal() for k in other_keys]))
