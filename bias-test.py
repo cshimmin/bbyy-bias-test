@@ -32,6 +32,8 @@ if __name__ == "__main__":
     parser.add_argument("--free-norm", action="store_true", help="Use free-floating norm params")
     parser.add_argument("--bias-adj", type=float, help="Apply a bias adjust offset")
     parser.add_argument("--poisson", action="store_true", help="Randomize number of generated events by poisson sampling.")
+    parser.add_argument("--reinit", action="store_true", help="Reinitialize NPs and POI before fits.")
+    parser.add_argument("--offset", action="store_true", help="Use offset option in createNLL")
     parser.add_argument("--only-good", action="store_true", help="Only write out fits that had 0/0 status.")
     parser.add_argument("--skip-minos", action="store_true", help="Do not run minos, only migrad")
     parser.add_argument("--hesse", action="store_true", help="Run Hesse after Migrad")
@@ -160,7 +162,12 @@ if __name__ == "__main__":
     statuses = []
     status_skip = 0
     for ds in datasets:
-        nll = pdf.createNLL(ds)
+        if args.reinit:
+            print "Re-initializing NP and POI values."
+            for v in iterset(mc.GetNuisanceParameters()):
+                v.setVal(0)
+            xsec.setVal(0.5)
+        nll = pdf.createNLL(ds, r.RooFit.Offset(args.offset))
 
         fit_statuses = []
         minimizer = r.RooMinuit(nll)
