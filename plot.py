@@ -41,11 +41,15 @@ if __name__ == "__main__":
                 data[xs][mass] = np.load(f)
             except IOError:
                 print "Warning, IOError when opening", f
+            except ValueError:
+                print "Warning, ValueError when opening", f
         else:
             try:
                 data[xs][mass] = np.hstack([data[xs][mass], np.load(f)])
             except IOError:
                 print "Warning, IOError when opening", f
+            except ValueError:
+                print "Warning, ValueError when opening", f
 
     adjustments = []
     adjustments_avg = []
