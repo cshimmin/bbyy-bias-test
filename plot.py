@@ -22,6 +22,7 @@ def parse_filename(fname):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--do-fit", action="store_true", help="Do a fit of bias vs. injected")
+    parser.add_argument("--bootstrap", metavar="N", type=int, help="Compute errorbars using N trials.")
     parser.add_argument("input_dir", help="The directory containing fit results")
     args = parser.parse_args()
 
@@ -57,26 +58,41 @@ if __name__ == "__main__":
         print "xsec:", xs
         avg = []
         med = []
+        med_bs = []
         masses = sorted(data[xs].keys())
         for mass in masses:
             print "  mass %d  "%mass, len(data[xs][mass])
             avg.append(np.mean(data[xs][mass]))
             med.append(np.median(data[xs][mass]))
+            # bootstrap median errors
+            if args.bootstrap:
+                med_bs.append(np.std([np.median(np.random.choice(data[xs][mass], size=len(data[xs][mass]))) for _ in xrange(args.bootstrap)]))
         med = np.array(med)
+        med_bs = np.array(med_bs)
         avg = np.array(avg)
+
+        if args.bootstrap:
+            print "Bootstrap errors (xs=%g; N=%d):"%(xs, args.bootstrap)
+            print med_bs
 
         plt.figure(1)
         plt.plot(masses, med, '.-', color='C%d'%idx, label="inj'd = %g pb"%xs)
+        if args.bootstrap:
+            plt.fill_between(masses, med-med_bs, med+med_bs, facecolor='C%d'%idx, alpha=0.15)
         #plt.plot(masses, avg, '--', color='C%d'%idx, label='xs=%g (avg)'%xs)
         plt.figure(2)
         plt.plot(masses, med-xs, '.-', label="inj'd = %g pb (avg: %0.2f +/- %0.2f)"%(xs, np.mean(med-xs), np.std(med-xs)))
+        if args.bootstrap:
+            plt.fill_between(masses, med-xs-med_bs, med-xs+med_bs, facecolor='C%d'%idx, alpha=0.15)
         plt.figure(5)
         plt.plot(masses, avg-xs, '.-', label="inj'd = %g pb (avg: %0.2f +/- %0.2f)"%(xs, np.mean(avg-xs), np.std(avg-xs)))
         adjustments.append( (xs, np.mean(med-xs), np.std(med-xs)) )
         adjustments_avg.append( (xs, np.mean(avg-xs), np.std(avg-xs)) )
         if xs>0:
             plt.figure(3)
-            plt.plot(masses, (med-xs)/xs, '.-', label="inj'd = %g pb"%xs)
+            plt.plot(masses, (med-xs)/xs, '.-', label="inj'd = %g pb"%xs, color='C%d'%idx)
+            if args.bootstrap:
+                plt.fill_between(masses, (med-xs-med_bs)/xs, (med-xs+med_bs)/xs, facecolor='C%d'%idx, alpha=0.15)
     plt.figure(1)
     plt.ylabel('median best-fit signal [pb]')
     plt.xlabel('mX [GeV]')
