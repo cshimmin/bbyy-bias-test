@@ -54,7 +54,9 @@ if __name__ == "__main__":
     parser.add_argument("--ntrial", type=int, default=10, help="The number of trials generate")
     parser.add_argument("--mX", type=int, default=300, help="The resonance mass [GeV]")
     parser.add_argument("--xsec", type=float, default=1.0, help="The signal cross section to inject [pb]")
+    parser.add_argument("--poi-min", type=float, help="Minimum POI value")
     parser.add_argument("--freeze-bias", action="store_true", help="Fix the BIAS NP at zero")
+    parser.add_argument("--freeze-ss", action="store_true", help="Fix the spurious signal NPs at zero")
     parser.add_argument("--free-shape", action="store_true", help="Use free-floating shape params")
     parser.add_argument("--freeze-shape", action="store_true", help="Fix the shape params to constant values")
     parser.add_argument("--free-norm", action="store_true", help="Use free-floating norm params")
@@ -104,6 +106,16 @@ if __name__ == "__main__":
         print "fixing BIAS=0"
         w.obj("BIAS").setVal(0)
         w.obj("BIAS").setConstant(True)
+    if args.freeze_ss:
+        print "fixing SS=0"
+        w.obj("bias_bb").setVal(0)
+        w.obj("bias_bb").setConstant(True)
+        w.obj("bias_bj").setVal(0)
+        w.obj("bias_bj").setConstant(True)
+    if args.poi_min is not None:
+        print "Setting POI minimum=%g"%args.poi_min
+        w.obj("npbBSM").setMin(args.poi_min)
+        w.obj("npbBSM").Print()
 
     if args.free_shape or args.freeze_shape:
         if args.free_shape:
