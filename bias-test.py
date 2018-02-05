@@ -18,6 +18,34 @@ def iterset(rooset):
         if not x: break
         yield x
 
+def bias_adj_function(n):
+    if n == 0:
+        # linear between 260,400, constant above.
+        def fn(mass, xs):
+            x0, y0 = 260, -0.055
+            x1, y1 = 400, -0.01
+            if mass>x1:
+                return y1
+            else:
+                m = (y1-y0)/(x1-x0)
+                b = y0 - m*x0
+                return mass*m + b
+        return fn
+    elif n == 1:
+        # constants at particular values of xs to match average over mX range
+        def fn(mass, xs):
+            if xs == 0:
+                return -0.03
+            elif xs == 0.25:
+                return -0.02
+            elif xs == 0.5:
+                return -0.02
+            elif xs == 1.0:
+                return -0.01
+        return fn
+    else:
+        raise Exception("Unknown function: %d"%n)
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--ws", required=True, help="The workspace file")
@@ -31,6 +59,7 @@ if __name__ == "__main__":
     parser.add_argument("--freeze-shape", action="store_true", help="Fix the shape params to constant values")
     parser.add_argument("--free-norm", action="store_true", help="Use free-floating norm params")
     parser.add_argument("--bias-adj", type=float, help="Apply a bias adjust offset")
+    parser.add_argument("--bias-adj-function", type=int, help="Apply a parametric bias adjust function")
     parser.add_argument("--poisson", action="store_true", help="Randomize number of generated events by poisson sampling.")
     parser.add_argument("--reinit", action="store_true", help="Reinitialize NPs and POI before fits.")
     parser.add_argument("--offset", action="store_true", help="Use offset option in createNLL")
@@ -51,8 +80,11 @@ if __name__ == "__main__":
 
     pdf = mc.GetPdf()
 
-    if not args.bias_adj is None:
-        w.factory("expr::npbBSM_adj('npbBSM-bias_adj',npbBSM,bias_adj[0])")
+    if args.bias_adj is not None or args.bias_adj_function is not None:
+        if args.bias_adj_function is not None:
+            args.bias_adj = bias_adj_function(args.bias_adj_function)(args.mX, args.xsec)
+        print "Applying bias adjust of:", args.bias_adj
+        w.factory("expr::npbBSM_adj('npbBSM+bias_adj',npbBSM,bias_adj[0])")
         w.factory("EDIT::pdf_alt(%s,npbBSM=npbBSM_adj)"%pdf.GetName())
         w.obj("bias_adj").setVal(args.bias_adj)
         pdf = w.obj("pdf_alt")
@@ -114,6 +146,8 @@ if __name__ == "__main__":
     # generate datasets
     datasets = []
     expected_events = pdf.expectedEvents(r.RooArgSet(cat,obs))
+    if args.bias_adj is not None:
+        w.obj("bias_adj").setVal(0)
     for itrial in xrange(args.ntrial):
         if args.poisson:
             ds = pdf.generate(r.RooArgSet(cat, obs), np.random.poisson(expected_events))
@@ -121,6 +155,8 @@ if __name__ == "__main__":
             ds = pdf.generate(r.RooArgSet(cat, obs))
         ds.SetName("ds_%03d"%itrial)
         datasets.append(ds)
+    if args.bias_adj is not None:
+        w.obj("bias_adj").setVal(args.bias_adj)
 
     xsec.setVal(1)
     xsec.setConstant(False)
@@ -160,6 +196,7 @@ if __name__ == "__main__":
     errs_lo = []
     errs_hi = []
     statuses = []
+    nll_invalid = []
     status_skip = 0
     for ds in datasets:
         if args.reinit:
@@ -172,13 +209,18 @@ if __name__ == "__main__":
         fit_statuses = []
         minimizer = r.RooMinuit(nll)
         minimizer.migrad()
-        fit_statuses.append(minimizer.save().status())
+        res = minimizer.save()
+        fit_statuses.append(res.status())
         if args.hesse:
             minimizer.hesse()
-            fit_statuses.append(minimizer.save().status())
+            res = minimizer.save()
+            fit_statuses.append(res.status())
         if not args.skip_minos:
             minimizer.minos()
-            fit_statuses.append(minimizer.save().status())
+            res = minimizer.save()
+            fit_statuses.append(res.status())
+
+        nll_invalid.append(res.numInvalidNLL())
 
         if args.only_good and max(fit_statuses)>0:
             status_skip += 1
@@ -199,6 +241,7 @@ if __name__ == "__main__":
                         errs_lo=errs_lo,
                         errs_hi=errs_hi,
                         statuses=statuses,
+                        nll_invalid=nll_invalid,
                         argv=sys.argv,
                         jobid=os.environ.get('SLURM_JOBID', None),
                         runtime=(time.time() - START_TIME)
