@@ -20,7 +20,11 @@ if __name__ == "__main__":
     times = []
     processed = []
     for fname in input_files:
-        d = cPickle.load(open(fname))
+        try:
+            d = cPickle.load(open(fname))
+        except EOFError:
+            print "Skipping corrupt file", fname
+            continue
         jid = d['jobid']
         ntotal += len(d['statuses'])
         nfail += max(max(d['statuses']))
