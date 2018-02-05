@@ -68,6 +68,7 @@ if __name__ == "__main__":
     parser.add_argument("--only-good", action="store_true", help="Only write out fits that had 0/0 status.")
     parser.add_argument("--skip-minos", action="store_true", help="Do not run minos, only migrad")
     parser.add_argument("--hesse", action="store_true", help="Run Hesse after Migrad")
+    parser.add_argument("--plots", action="store_true", help="Save plots of pseudoexperiments/fits")
     args = parser.parse_args()
 
     r.RooRandom.randomGenerator().SetSeed(args.seed)
@@ -210,7 +211,15 @@ if __name__ == "__main__":
     statuses = []
     nll_invalid = []
     status_skip = 0
-    for ds in datasets:
+    if args.plots:
+        canvas = r.TCanvas("c1","c1", 800, 600)
+        canvas.cd()
+        pad1 = r.TPad("pad1","pad1",0,0.5,1,1)
+        pad1.Draw()
+        canvas.cd()
+        pad2 = r.TPad("pad2","pad2",0,0,1,0.5)
+        pad2.Draw()
+    for ds_idx,ds in enumerate(datasets):
         if args.reinit:
             print "Re-initializing NP and POI values."
             for v in iterset(mc.GetNuisanceParameters()):
@@ -239,6 +248,24 @@ if __name__ == "__main__":
             continue
 
         statuses.append( tuple(fit_statuses) )
+
+        if args.plots:
+            frame1 = w.obj("gg_mass").frame()
+            ds.plotOn(frame1, r.RooFit.Cut("channellist==channellist::bj"))
+            pdf.plotOn(frame1, r.RooFit.Slice(cat, "bj"), r.RooFit.ProjWData(r.RooArgSet(cat), ds), r.RooFit.LineColor(r.kRed))
+            pad1.cd()
+            frame1.SetTitle(";;")
+            frame1.GetXaxis().SetLabelSize(0.07)
+            frame1.Draw()
+            frame2 = w.obj("gg_mass").frame()
+            ds.plotOn(frame2, r.RooFit.Cut("channellist==channellist::bb"))
+            pdf.plotOn(frame2, r.RooFit.Slice(cat, "bb"), r.RooFit.ProjWData(r.RooArgSet(cat), ds), r.RooFit.LineColor(r.kRed))
+            pad2.cd()
+            frame2.SetTitle(";;")
+            frame2.GetXaxis().SetLabelSize(0.07)
+            frame2.Draw()
+            canvas.Update()
+            canvas.SaveAs(args.out+".%d.pdf"%ds_idx)
 
         poi_vals.append(xsec.getVal())
         other_vals.append(tuple([w.obj(k).getVal() for k in other_keys]))
