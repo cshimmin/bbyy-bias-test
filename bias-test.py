@@ -22,8 +22,8 @@ def bias_adj_function(n):
     if n == 0:
         # linear between 260,400, constant above.
         def fn(mass, xs):
-            x0, y0 = 260, -0.055
-            x1, y1 = 400, -0.01
+            x0, y0 = 260, -0.04
+            x1, y1 = 400, 0.005
             if mass>x1:
                 return y1
             else:
@@ -69,6 +69,7 @@ if __name__ == "__main__":
     parser.add_argument("--skip-minos", action="store_true", help="Do not run minos, only migrad")
     parser.add_argument("--hesse", action="store_true", help="Run Hesse after Migrad")
     parser.add_argument("--plots", action="store_true", help="Save plots of pseudoexperiments/fits")
+    parser.add_argument("--ghost", action="store_true", help="Add ghost datapoints to prevent weird fits.")
     args = parser.parse_args()
 
     r.RooRandom.randomGenerator().SetSeed(args.seed)
@@ -167,6 +168,22 @@ if __name__ == "__main__":
         else:
             ds = pdf.generate(r.RooArgSet(cat, obs))
         ds.SetName("ds_%03d"%itrial)
+        ds.Print()
+        if args.ghost:
+            wt = w.factory("wt[1.0]")
+            ds.addColumn(wt)
+
+            ds = r.RooDataSet("ds_%03d"%itrial, "ds_%03d"%itrial, ds, ds.get(), "", "wt")
+            ds.Print()
+            #xdummy = obs.getMin()
+            xdummy = 255
+            while xdummy < obs.getMax():
+                obs.setVal(xdummy)
+                for xcat in ('bb', 'bj'):
+                    cat.setLabel(xcat)
+                    ds.add(r.RooArgSet(cat, obs), 1e-9)
+                xdummy += 2.0
+        ds.Print()
         datasets.append(ds)
     if args.bias_adj is not None:
         w.obj("bias_adj").setVal(args.bias_adj)
