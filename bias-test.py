@@ -70,6 +70,9 @@ if __name__ == "__main__":
     parser.add_argument("--hesse", action="store_true", help="Run Hesse after Migrad")
     parser.add_argument("--plots", action="store_true", help="Save plots of pseudoexperiments/fits")
     parser.add_argument("--ghost", action="store_true", help="Add ghost datapoints to prevent weird fits.")
+    parser.add_argument("--ghost-start", type=float, default=255, help="Lowest m_jjyy mass point to add ghost events at")
+    parser.add_argument("--ghost-interval", type=float, default=2.0, help="Spacing between ghost events")
+    parser.add_argument("--ghost-weight", type=float, default=1e-9, help="Weight for ghost events")
     args = parser.parse_args()
 
     r.RooRandom.randomGenerator().SetSeed(args.seed)
@@ -176,13 +179,13 @@ if __name__ == "__main__":
             ds = r.RooDataSet("ds_%03d"%itrial, "ds_%03d"%itrial, ds, ds.get(), "", "wt")
             ds.Print()
             #xdummy = obs.getMin()
-            xdummy = 255
+            xdummy = args.ghost_start
             while xdummy < obs.getMax():
                 obs.setVal(xdummy)
                 for xcat in ('bb', 'bj'):
                     cat.setLabel(xcat)
-                    ds.add(r.RooArgSet(cat, obs), 1e-9)
-                xdummy += 2.0
+                    ds.add(r.RooArgSet(cat, obs), args.ghost_weight)
+                xdummy += args.ghost_interval
         ds.Print()
         datasets.append(ds)
     if args.bias_adj is not None:
