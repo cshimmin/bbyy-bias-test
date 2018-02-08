@@ -59,17 +59,23 @@ if __name__ == "__main__":
         avg = []
         med = []
         med_bs = []
+        avg_bs = []
         masses = sorted(data[xs].keys())
+        nfits = []
         for mass in masses:
             print "  mass %d  "%mass, len(data[xs][mass])
+            nfits.append(len(data[xs][mass]))
             avg.append(np.mean(data[xs][mass]))
             med.append(np.median(data[xs][mass]))
             # bootstrap median errors
             if args.bootstrap:
                 med_bs.append(np.std([np.median(np.random.choice(data[xs][mass], size=len(data[xs][mass]))) for _ in xrange(args.bootstrap)]))
+                avg_bs.append(np.std([np.mean(np.random.choice(data[xs][mass], size=len(data[xs][mass]))) for _ in xrange(args.bootstrap)]))
         med = np.array(med)
         med_bs = np.array(med_bs)
+        avg_bs = np.array(avg_bs)
         avg = np.array(avg)
+        nfits = np.array(nfits)
 
         if args.bootstrap:
             print "Bootstrap errors (xs=%g; N=%d):"%(xs, args.bootstrap)
@@ -86,6 +92,8 @@ if __name__ == "__main__":
             plt.fill_between(masses, med-xs-med_bs, med-xs+med_bs, facecolor='C%d'%idx, alpha=0.15)
         plt.figure(5)
         plt.plot(masses, avg-xs, '.-', label="inj'd = %g pb (avg: %0.2f +/- %0.2f)"%(xs, np.mean(avg-xs), np.std(avg-xs)))
+        if args.bootstrap:
+            plt.fill_between(masses, avg-xs-avg_bs, avg-xs+avg_bs, facecolor='C%d'%idx, alpha=0.15)
         adjustments.append( (xs, np.mean(med-xs), np.std(med-xs)) )
         adjustments_avg.append( (xs, np.mean(avg-xs), np.std(avg-xs)) )
         if xs>0:
@@ -93,6 +101,9 @@ if __name__ == "__main__":
             plt.plot(masses, (med-xs)/xs, '.-', label="inj'd = %g pb"%xs, color='C%d'%idx)
             if args.bootstrap:
                 plt.fill_between(masses, (med-xs-med_bs)/xs, (med-xs+med_bs)/xs, facecolor='C%d'%idx, alpha=0.15)
+        plt.figure(6)
+        plt.plot(masses, nfits, '.-', label="inj'd = %g pb"%xs, color='C%d'%idx)
+
     plt.figure(1)
     plt.ylabel('median best-fit signal [pb]')
     plt.xlabel('mX [GeV]')
@@ -108,6 +119,12 @@ if __name__ == "__main__":
     plt.xlabel('mX [GeV]')
     plt.legend()
     plt.savefig(os.path.join(args.input_dir,'average_bias.pdf'))
+
+    plt.figure(6)
+    plt.ylabel('number of successful P.E.')
+    plt.xlabel('mX [GeV]')
+    plt.legend()
+    plt.savefig(os.path.join(args.input_dir,'nfit.pdf'))
 
     plt.figure(3)
     plt.ylabel('median bias (fractional)')
